@@ -11,7 +11,7 @@ dir = 'rawdata'
 fileName = os.listdir(dir)
 header = 'dat'
 #curfile = dir + '\\' + fileName[1]
-curfile = 'D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\201907_caltech5\\codepackage_aftertrip\\rawdata\\jul31_0610asp1_m1_shankout00_chunk_0'
+curfile = 'C:\Users\jchoi\Documents\GitHub\pyspad\rawdata\\jul31_0610asp1_m1_shankout00_chunk_0'
 
 start = time.time()
 print("Begin parsing.")
