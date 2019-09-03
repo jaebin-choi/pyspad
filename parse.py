@@ -7,16 +7,17 @@ ignoreframes = 10
 npix = 512
 datasize = 1000
 
-dir = 'rawdata'
+#dir = 'D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\git\\pyspad\\rawdata\\' #os.getcwd()
+dir = '/Users/jchoi/Dropbox/Projects/SpadProbe/git/pyspad/rawdata/'
 fileName = os.listdir(dir)
 header = 'dat'
 #curfile = dir + '\\' + fileName[1]
-curfile = 'C:\Users\jchoi\Documents\GitHub\pyspad\rawdata\\jul31_0610asp1_m1_shankout00_chunk_0'
+curfile = 'dat_img_0'
 
 start = time.time()
 print("Begin parsing.")
 
-f = open(curfile, mode="r")
+f = open(dir + curfile, mode="r")
 aint = np.fromfile(f, dtype=np.uint16)
 alen = len(aint)
 #addr = bytearray(alen) #bytearray means only upto 256
@@ -68,9 +69,9 @@ print("Parsed in "+str(round(end-start,3))+" s.  "+str(goodframes)+" of "+str(da
 
 
 #plot parsed data
-start = time.time()
-print("Begin plotting.")
-
+# start = time.time()
+# print("Begin plotting.")
+#
 # plt.figure()
 #
 # plt.subplot(211)

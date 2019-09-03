@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
         QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
         QVBoxLayout, QWidget)
+import pyqtgraph as pg
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
@@ -41,13 +42,18 @@ class WidgetGallery(QDialog):
 
     def createPlotBox(self):
         self.plotBox = QGroupBox("Phase Sweep")
-        figure = Figure()
-        canvas = FigureCanvasQTAgg(figure)
 
-        figure.add_subplot(111)
-
-        layoutVertical = QVBoxLayout(self.plotBox)
-        layoutVertical.addWidget(canvas)
+        win = pg.GraphicsWindow()  # Automatically generates grids with multiple items
+        win.addPlot(row=0, col=0)
+        #pg.plot(range(1,512))
+        # figure = Figure()
+        # canvas = FigureCanvasQTAgg(figure)
+        #
+        # figure.add_subplot(111)
+        #
+        #
+        # layoutVertical = QVBoxLayout(self.plotBox)
+        # layoutVertical.addWidget(canvas)
 
     def createPlotBox2(self):
         self.plotBox2 = QGroupBox("SPAD Probe Image")
