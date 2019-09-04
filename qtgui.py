@@ -6,10 +6,11 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
         QVBoxLayout, QWidget)
 import pyqtgraph as pg
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
+import numpy as np
+import matplotlib.pyplot as plt
 
 
+# pg.setConfigOption('background', 'w')
 
 
 
@@ -19,55 +20,58 @@ class WidgetGallery(QDialog):
 
         self.originalPalette = QApplication.palette()
         self.createControlGroupBox()
-        self.createPlotBox()
         self.createProgressBar()
-        self.createPlotBox2()
 
+        #declare plot widgets
+        self.pw1 = pg.PlotWidget(name='Plot1')
+        self.pw2 = pg.PlotWidget(name='Plot2')
+        self.pw3 = pg.PlotWidget(name='Plot3')
 
+        #place different widgets on the layout
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.controlGroupBox, 0, 0)
-        mainLayout.addWidget(self.plotBox, 1, 0)
+        mainLayout.addWidget(self.pw1, 1, 0)
+        mainLayout.addWidget(self.pw2, 0, 1)
+        mainLayout.addWidget(self.pw3, 1, 1)
         mainLayout.addWidget(self.progressBar, 2, 0, 1, 2)
-        mainLayout.addWidget(self.plotBox2, 0, 1,2,1)
 
-        mainLayout.setRowStretch(1, 1)
-        mainLayout.setRowStretch(2, 1)
-        mainLayout.setColumnStretch(0, 1)
-        mainLayout.setColumnStretch(1, 1)
         self.setLayout(mainLayout)
-
         self.setWindowTitle("SPAD Probe Acquisition")
 
+        #set axes
+        self.setPlotWidget(self.pw1, 0, 512, 0, 512, 'Pixel', 'Counts', '', '')
 
+        self.runButton.clicked.connect(self.ifButtonClicked)
 
-    def createPlotBox(self):
-        self.plotBox = QGroupBox("Phase Sweep")
+    def ifButtonClicked(self):
+        import parse
+        # inputBitfile = QLineEdit.text(self.lineEdit1)
+        # inputSavedir = QLineEdit.text(self.lineEdit2)
+        # inputNframes = QLineEdit.text(self.lineEdit3)
 
-        win = pg.GraphicsWindow()  # Automatically generates grids with multiple items
-        win.addPlot(row=0, col=0)
-        #pg.plot(range(1,512))
-        # figure = Figure()
-        # canvas = FigureCanvasQTAgg(figure)
-        #
-        # figure.add_subplot(111)
-        #
-        #
-        # layoutVertical = QVBoxLayout(self.plotBox)
-        # layoutVertical.addWidget(canvas)
+        #declare variables (will be integrated)
+        npix=512
+        datasize=1000
+        ignoreframes=10
+        # dir='D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\git\\pyspad\\rawdata\\'
+        dir='D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\201907_caltech5\\codepackage_aftertrip\\rawdata\\'
+        iframe=0
 
-    def createPlotBox2(self):
-        self.plotBox2 = QGroupBox("SPAD Probe Image")
-        figure = Figure()
-        canvas = FigureCanvasQTAgg(figure)
-        figure.add_subplot(211)
-        figure.add_subplot(212)
+        #fetch data from parse module
+        [self.img, self.scatt, self.goodframes] = parse.Parse(npix, datasize, ignoreframes, dir, iframe).get_data()
 
-        layoutVertical = QVBoxLayout(self.plotBox2)
-        layoutVertical.addWidget(canvas)
+        #update plots with parsed data
+        self.pw2.plot(self.img) #flattened image
+        self.pw3.plot(np.tile(range(0,npix),self.goodframes), self.scatt[0:self.goodframes*npix]) #raw count scatterplot
 
-        # import parse_v3
-        # parse_v3
-        # plt.scatter(np.tile(range(0, npix), goodframes), scatt[0:goodframes * npix], color='tab:blue')
+        self.setPlotWidget(self.pw2, 0, 512, 0, self.goodframes*63, 'Pixel', 'Accumulated Counts', '', '')
+        self.setPlotWidget(self.pw3, 0, 512, 0, 64, 'Pixel', 'Flattened Counts', '', '')
+
+    def setPlotWidget(self, plot, xmin, xmax, ymin, ymax, xlabel, ylabel, xunit, yunit):
+        plot.setLabel('bottom', xlabel, units=xunit)
+        plot.setLabel('left', ylabel, units=yunit)
+        plot.setXRange(xmin, xmax)
+        plot.setYRange(ymin, ymax)
 
     def advanceProgressBar(self):
         curVal = self.progressBar.value()
@@ -85,38 +89,35 @@ class WidgetGallery(QDialog):
         layoutOption.addWidget(radioButton1)
         layoutOption.addWidget(radioButton2)
 
-        lineEdit1 = QLineEdit('bitfile directory')
-        lineEdit2 = QLineEdit('save directory')
-        lineEdit3 = QLineEdit('#frames')
+        lineEdit1 = QLineEdit('enter full path of bitfile')
+        lineEdit2 = QLineEdit('enter full path of save directory')
+        lineEdit3 = QLineEdit('enter number of frames to acquire 1-100000')
 
         titleOption = QLabel("Acq Option")
-        title1 = QLabel("bitfile")
+        title1 = QLabel('bitfile')
         title1.setBuddy(lineEdit1)
         title2 = QLabel('savedir')
         title2.setBuddy(lineEdit2)
-
         title3 = QLabel('#frames')
         title3.setBuddy(lineEdit3)
 
-        defaultPushButton = QPushButton("Run")
-        defaultPushButton.setDefault(True)
+        self.runButton = QPushButton("Run")
+        self.runButton.setDefault(False)
 
-
-        #layout = QVBoxLayout()
-        layout = QGridLayout()
+        #create layout
+        layout = QGridLayout() #QVBoxLayout() vs QHBoxLayout() vs QGridLayout()
         layout.setSpacing(5)
         layout.addWidget(titleOption, 0,0)
         layout.addLayout(layoutOption, 0,1)
         layout.addWidget(title1, 1,0)
-        layout.addWidget(lineEdit1, 1,1, 1,20)
+        layout.addWidget(lineEdit1, 1,1, 1,20) #last two ints define relative stretch conditions
         layout.addWidget(title2, 2,0)
         layout.addWidget(lineEdit2, 2,1, 1,20)
         layout.addWidget(title3, 3,0)
         layout.addWidget(lineEdit3, 3,1, 1,20)
-        layout.addWidget(defaultPushButton,4,0)
+        layout.addWidget(self.runButton,4,0)
 
         self.controlGroupBox.setLayout(layout)
-
 
     def createProgressBar(self):
         self.progressBar = QProgressBar()
@@ -130,15 +131,12 @@ class WidgetGallery(QDialog):
 
 
 if __name__ == '__main__':
-
     import sys
-
-
-
     app = QApplication(sys.argv)
     app.setApplicationName('SPADProbeAcquire')
+    app.setStyle("fusion")
     gallery = WidgetGallery()
-    gallery.resize(1000,500)
+    gallery.resize(1200,600)
     gallery.show()
     sys.exit(app.exec_())
 
