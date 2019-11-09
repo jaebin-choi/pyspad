@@ -93,8 +93,7 @@ class WidgetGallery(QDialog):
         layoutOption.addWidget(radioButton1)
         layoutOption.addWidget(radioButton2)
 
-        self.lineEdit1 = QLineEdit(self)
-        # lineEdit1 = QLineEdit('enter full path of bitfile')
+        self.lineEdit1 = QLineEdit('enter full path of bitfile')
         self.lineEdit2 = QLineEdit('D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\201902_caltechGcamp\\code package\\outfile\\0223\\0223_recording_LP57\\')
         self.lineEdit3 = QLineEdit('4')
 
