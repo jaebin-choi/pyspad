@@ -61,6 +61,9 @@ class WidgetGallery(QDialog):
         dir='D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\201902_caltechGcamp\\code package\\outfile\\0223\\0223_recording_LP57\\'
         iframe=4
 
+        #get data from opal kelly
+
+
         #fetch data from parse module
         [self.img, self.scatt, self.goodframes] = parse.Parse(npix, datasize, ignoreframes, inputSavedir, int(inputNframes)).get_data()
 
