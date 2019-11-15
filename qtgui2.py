@@ -79,7 +79,7 @@ class WidgetGallery(QDialog):
         self.clkdiv = round(int(self.fvco)/int(self.frep))
 
 
-    @pyqtSlot() ##################################################### START HERE 11/14. MAKE
+    @pyqtSlot() ##################################################### START HERE 11/14. HAVE BUTTON ACTIVATE FUNCTION
     def ifbtnFlashClicked(self):
         flash = True
         reset = True
