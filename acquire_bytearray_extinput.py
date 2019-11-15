@@ -9,11 +9,11 @@ import numpy as np
 
 class AcqOK(object):
     def __init__(self, flash, reset, reprogpll, parseenable, saveenable, getdata,
-                 numpix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname):
+                 npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname):
 
         fnum = int(fnum)
         fignore = int(fignore)
-        numpix = int(numpix)
+        npix = int(npix)
 
         # FIND AND OPEN THE OPAL KELLY (CAN ONLY RECOGNIZE SINGLE DEVICE) ----------- ----------- ----------- ----------- -----------
         device = ok.okCFrontPanel()
@@ -67,8 +67,8 @@ class AcqOK(object):
         print('     PLL reprogrammed. Status is ', statusWire)
 
         # Initialize data
-        self.img = np.zeros(numpix, dtype=np.uint64)
-        self.scatt = np.zeros(fnum * numpix, dtype=np.uint8)
+        self.img = np.zeros(npix, dtype=np.uint64)
+        self.scatt = np.zeros(fnum * npix, dtype=np.uint8)
         self.goodframes = 0
 
 
@@ -120,7 +120,7 @@ class AcqOK(object):
 
                         if parseenable == True:
                             # parse without saving rawdata. only save resulting images.
-                            [self.img, self.scatt, self.goodframes] = parse_bytearray.ParseBytearray(numpix, fnum,
+                            [self.img, self.scatt, self.goodframes] = parse_bytearray.ParseBytearray(npix, fnum,
                                                                         fignore, data_out).get_data()
                             self.outputdata()  # output data for live imaging
 

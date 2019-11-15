@@ -38,10 +38,10 @@ class WidgetGallery(QDialog):
 
         #box sizes
         self.controlGroupBox.setMinimumWidth(600)
-        self.plot2.setMinimumWidth(1000)
+        self.plot2.setMinimumWidth(800)
         self.plot2.setMinimumHeight(200)
-        self.plot3.setMinimumWidth(1000)
-        self.plot2.setMinimumHeight(200)
+        self.plot3.setMinimumWidth(800)
+        self.plot3.setMinimumHeight(200)
         self.setLayout(mainLayout)
         self.setWindowTitle("SPAD Probe Acquisition")
 
@@ -51,15 +51,21 @@ class WidgetGallery(QDialog):
         # connect buttons
         self.btnRun.clicked.connect(self.ifbtnRunClicked)
         self.btnFlash.clicked.connect(self.ifbtnFlashClicked)
+        self.btnReset.clicked.connect(self.ifbtnResetClicked)
+        self.btnStop.clicked.connect(self.ifbtnStopClicked)
 
-        # declare variables (will be integrated)
+        # global parameters upon initiation
+        self.sidx = 1
+        self.npix = 512
+
+    def getValuesFromGUI(self):
+        # Acquisition settings
         self.Flash = int(self.tglFlash.isChecked())
         self.Reset = int(self.tglReset.isChecked())
         self.ReprogPLL = int(self.tglReprogPLL.isChecked())
         self.Parse = int(self.tglParse.isChecked())
         self.Save = int(self.tglSave.isChecked())
-
-        self.npix = 512
+        # parameters
         self.bitfile = self.LEbitfile.text()
         self.rstcode = self.LErstcode.text()
         self.fpgaSwitches = self.LEswitch.text()  # ep00wire
@@ -74,39 +80,50 @@ class WidgetGallery(QDialog):
         self.tacq = self.LEtacq.text()
         self.sdir = self.LEsdir.text()
         self.sname = self.LEsname.text()
-        self.sidx = self.LEsidx.text()
+        # self.sidx = self.LEsidx.text()  # throws error when 'Run' is clicked
 
-        self.clkdiv = round(int(self.fvco)/int(self.frep))
+        self.clkdiv = round(int(self.fvco) / int(self.frep))
 
-
-    @pyqtSlot() ##################################################### START HERE 11/14. HAVE BUTTON ACTIVATE FUNCTION
+    @pyqtSlot()
     def ifbtnFlashClicked(self):
+        self.getValuesFromGUI()
         flash = True
         reset = True
-        reprogpll = False
+        reprogpll = True
         parseenable = False
         saveenable = False
         getdata = False
 
-        [img, scatt, goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable, saveenable, getdata,
-            self.numpix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
+        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable, saveenable, getdata,
+            self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
             self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
 
+    @pyqtSlot()
+    def ifbtnResetClicked(self):
+        self.getValuesFromGUI()
+        flash = False
+        reset = True
+        reprogpll = True
+        parseenable = False
+        saveenable = False
+        getdata = False
+
+        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable, saveenable, getdata,
+            self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
+            self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
 
 
 
     @pyqtSlot()
     def ifbtnRunClicked(self):
-        import parse
+        self.getValuesFromGUI()
+        getdata = True
 
+        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(self.Flash, self.Reset, self.ReprogPLL, self.Parse, self.Save, getdata,
+            self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
+            self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname + str(self.sidx).zfill(4)).outputdata()
 
-
-
-        # get data from opal kelly
-
-
-        # fetch data from parse module
-        [self.img, self.scatt, self.goodframes] = parse.Parse(self.npix, self.flen, self.fignore, self.sdir, 4).get_data()
+        # update plot with parsed data, using most recent data.
 
         # update plots with parsed data
         self.plot2.plot(self.img)  # flattened image
@@ -115,6 +132,12 @@ class WidgetGallery(QDialog):
         self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
         self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
 
+        self.sidx = self.sidx + 1
+        self.LEsidx.setText(str(self.sidx))
+
+    @pyqtSlot()
+    def ifbtnStopClicked(self):
+        self.btnStop.clicked.connect(self.close)
 
     def setPlotWidget(self, plot, xmin, xmax, ymin, ymax, xlabel, ylabel, xunit, yunit):
         plot.setLabel('bottom', xlabel, units=xunit)
@@ -125,13 +148,13 @@ class WidgetGallery(QDialog):
     def advanceProgressBar(self):
         curVal = self.progressBar.value()
         maxVal = self.progressBar.maximum()
-        self.progressBar.setValue(curVal + (maxVal - curVal) / 100)
+        self.progressBar.setValue(curVal + int((maxVal - curVal) / 100))
 
     def createControlGroupBox(self):
         self.controlGroupBox = QGroupBox("Controls")
 
         # create lineEdits
-        self.LEbitfile = QLineEdit('bitfile\\bitfilename.bit')
+        self.LEbitfile = QLineEdit('bitfile\\Nov2018_dualprobe_v1_03mmfpc_pll_intclk.bit')
         self.LErstcode = QLineEdit('7')
         self.LEswitch = QLineEdit('10000000100110000')
         self.LEfvco = QLineEdit('960')
@@ -143,7 +166,7 @@ class WidgetGallery(QDialog):
         self.LEfnum = QLineEdit('1000')
         self.LEinum = QLineEdit('10')  # or infinite
         self.LEtacq = QLineEdit('?')
-        self.LEsdir = QLineEdit('D:\\dropbox\\Dropbox\\Projects\\SpadProbe\\201902_caltechGcamp\\code package\\outfile\\0223\\0223_recording_LP57\\')
+        self.LEsdir = QLineEdit('rawdata')
         self.LEsname = QLineEdit('sample')
         self.LEsidx = QLineEdit('1')
 
@@ -165,12 +188,11 @@ class WidgetGallery(QDialog):
         Tsave = QLabel('Save')
         Tsdir = QLabel('Dir'); Tsdir.setBuddy(self.LEsdir)
         Tsname = QLabel('Name'); Tsname.setBuddy(self.LEsname)
-        Tsidx = QLabel('Index'); Tsidx.setBuddy(self.LEsidx)
+        Tsidx = QLabel('Nxt Idx'); Tsidx.setBuddy(self.LEsidx)
 
         # create buttons
         self.btnFlash = QPushButton("Flash"); self.btnFlash.setDefault(True)
         self.btnReset = QPushButton("Reset"); self.btnReset.setDefault(True)
-        self.btnReprogPLL = QPushButton("rePLL"); self.btnReprogPLL.setDefault(True)
         btngroup1 = QButtonGroup(self.controlGroupBox); btngroup1.setExclusive(False)
         self.tglFlash = QRadioButton("Flash"); self.tglFlash.setChecked(False)
         self.tglReset = QRadioButton("Reset"); self.tglReset.setChecked(True)
@@ -183,6 +205,7 @@ class WidgetGallery(QDialog):
         btngroup1.addButton(self.tglParse)
         btngroup1.addButton(self.tglSave)
         self.btnRun = QPushButton("Run"); self.btnRun.setDefault(False)
+        self.btnStop = QPushButton("Stop"); self.btnStop.setDefault(False)
 
         # create layout
         boxlayout = QVBoxLayout()
@@ -190,7 +213,7 @@ class WidgetGallery(QDialog):
         line = [Tbitfile, self.LEbitfile, self.btnFlash]
         size = [1, 100, 1]
         self.layoutSingleLine(boxlayout, line, size)
-        line = [Trstcode, self.LErstcode, Tswitch, self.LEswitch, self.btnReset, self.btnReprogPLL]
+        line = [Trstcode, self.LErstcode, Tswitch, self.LEswitch, self.btnReset]
         size = [1, 1, 1, 80, 1, 1]
         self.layoutSingleLine(boxlayout, line, size)
         line = [Tclock, Tfvco, self.LEfvco, Tfrep, self.LEfrep, Tduty, self.LEduty, Tphase, self.LEphase]
@@ -202,8 +225,8 @@ class WidgetGallery(QDialog):
         line = [Tsave, Tsdir, self.LEsdir, Tsname, self.LEsname, Tsidx, self.LEsidx]
         size = [2,1,100,1,30,1,1]
         self.layoutSingleLine(boxlayout, line, size)
-        line = [self.tglFlash, self.tglReset, self.tglReprogPLL, self.tglParse, self.tglSave, self.btnRun]
-        size = [1,1,1,1,1,100]
+        line = [self.tglFlash, self.tglReset, self.tglReprogPLL, self.tglParse, self.tglSave, self.btnRun, self.btnStop]
+        size = [1,1,1,1,1,100,100]
         self.layoutSingleLine(boxlayout, line, size)
 
         self.controlGroupBox.setLayout(boxlayout)
