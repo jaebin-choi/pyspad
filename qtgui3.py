@@ -1,3 +1,6 @@
+import glob
+import time
+
 from PyQt5.QtCore import QDateTime, Qt, QTimer, pyqtSlot, QThread
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
@@ -8,24 +11,110 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
 import pyqtgraph as pg
 import numpy as np
 import acquire_bytearray_extinput
-
-
-
+import acquire_bytearray_nooutput
+import os
+import ok
+import parse
+import parse_bytearray
 # pg.setConfigOption('background', 'w')
+import parse_singledat
 
 
+class ThRunAcq(QThread):
+    def __init__(self):
+        QThread.__init__(self)
 
-# class RunAcquisition(QThread):
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        main.getValuesFromGUI()
+        getdata = True
+
+        acquire_bytearray_nooutput.AcqOK(
+            main.Flash, main.Reset, main.ReprogPLL, main.Parse, main.Save, getdata,
+            main.npix, main.bitfile, main.rstcode, main.fpgaSwitches, main.clkdiv, main.duty, main.phase,
+            main.flen, main.fignore, main.fnum, main.inum, main.sdir, main.sname + str(main.sidx).zfill(4))
+
+
+class ThPlotLive(QThread):  # find most recent, parse it, and update
+    def __init__(self):
+        QThread.__init__(self)
+
+    def __del__(self):
+        self.wait()
+
+    def get_latest_file(self):
+        pathnow = os.getcwd() + '\\' + main.sdir  + '\\'
+        files = os.listdir(pathnow)
+        for i in range(0, len(files)):
+            files[i] = pathnow + files[i]
+        files2 = sorted(files, key=os.path.getmtime)
+        newest = files2[-1]
+        return newest
+
+    def run(self):
+        # find most recent piece of raw data in directory
+        # newest_prev = ''
+
+        while main.threadplotOn:
+            # time.sleep(0.5)
+            newest = self.get_latest_file()
+            print(newest)
+            [main.img, main.scatt, main.goodframes] = \
+                parse_singledat.Parse(main.npix, main.fnum, main.fignore, newest).get_data()
+
+            # update plots with parsed data
+            # main.plot2.plot(main.img)  # flattened image
+            # main.plot3.plot(np.tile(range(0, main.npix), main.goodframes),
+            #                 main.scatt[0:main.goodframes * main.npix])  # raw count scatterplot
+            # main.setPlotWidget(main.plot2, 0, 512, 0, max(main.img), 'Pixel', 'Accumulated Counts', '', '')
+            # main.setPlotWidget(main.plot3, 0, 512, 0, max(main.scatt), 'Pixel', 'Flattened Counts', '', '')
+
+            # newest_prev = newest
+
+# class Worker(QObject):
+#     stepIncreased = Signal(int)
 #
 #     def __init__(self):
-#         QThread.__init__(self)
+#         super(Worker, self).__init__()
+#         self._step = 0
+#         self._isRunning = True
+#         self._maxSteps = 20
 #
-#     def _start_acquisition(self, flash, reset, reprogpll, parseenable, saveenable, getdata,
-#                  npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname):
-#         [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable, saveenable, getdata,
-#                  npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname).outputdata()
+#     def get_latest_file(self):
+#         pathnow = os.getcwd() + '\\' + main.sdir  + '\\'
+#         files = os.listdir(pathnow)
+#         for i in range(0, len(files)):
+#             files[i] = pathnow + files[i]
+#         files2 = sorted(files, key=os.path.getmtime)
+#         newest = files2[-1]
+#         return newest
 #
-#     def run(self):
+#     def task(self):
+#         if not self._isRunning:
+#             self._isRunning = True
+#             self._step = 0
+#
+#         while main.threadplotOn:
+#             # time.sleep(0.5)
+#             newest = self.get_latest_file()
+#             print(newest)
+#             [main.img, main.scatt, main.goodframes] = \
+#                 parse_singledat.Parse(main.npix, main.fnum, main.fignore, newest).get_data()
+#
+#             # update plots with parsed data
+#             # main.plot2.plot(main.img)  # flattened image
+#             # main.plot3.plot(np.tile(range(0, main.npix), main.goodframes),
+#             #                 main.scatt[0:main.goodframes * main.npix])  # raw count scatterplot
+#             # main.setPlotWidget(main.plot2, 0, 512, 0, max(main.img), 'Pixel', 'Accumulated Counts', '', '')
+#             # main.setPlotWidget(main.plot3, 0, 512, 0, max(main.scatt), 'Pixel', 'Flattened Counts', '', '')
+#
+#         print "finished..."
+#
+#     def stop(self):
+#         self._isRunning = False
+
 
 
 class WidgetGallery(QDialog):
@@ -69,6 +158,11 @@ class WidgetGallery(QDialog):
         # global parameters upon initiation
         self.sidx = 1
         self.npix = 512
+
+        # create threads
+        self.threadrun = ThRunAcq()
+        self.threadplot = ThPlotLive()
+        self.threadplotOn = True
 
     def getValuesFromGUI(self):
         # Acquisition settings
@@ -126,28 +220,36 @@ class WidgetGallery(QDialog):
 
     @pyqtSlot()
     def ifbtnRunClicked(self):
-        self.getValuesFromGUI()
-        getdata = True
+        self.threadrun.start()
+        self.threadplotOn = True
+        self.threadplot.start()
 
-        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(self.Flash, self.Reset, self.ReprogPLL, self.Parse, self.Save, getdata,
-            self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
-            self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname + str(self.sidx).zfill(4)).outputdata()
-
-        # update plot with parsed data, using most recent data.
-
-        # update plots with parsed data
-        self.plot2.plot(self.img)  # flattened image
-        self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix])  # raw count scatterplot
-
-        self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
-        self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
-
-        self.sidx = self.sidx + 1
-        self.LEsidx.setText(str(self.sidx))
+        # self.getValuesFromGUI()
+        # getdata = True
+        #
+        # [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(self.Flash, self.Reset, self.ReprogPLL, self.Parse, self.Save, getdata,
+        #     self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
+        #     self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname + str(self.sidx).zfill(4)).outputdata()
+        #
+        # # update plots with parsed data
+        # self.plot2.plot(self.img)  # flattened image
+        # self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix])  # raw count scatterplot
+        #
+        # self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
+        # self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
+        #
+        # self.sidx = self.sidx + 1
+        # self.LEsidx.setText(str(self.sidx))
 
     @pyqtSlot()
     def ifbtnStopClicked(self):
-        self.btnStop.clicked.connect(self.close)
+        self.threadrun.terminate()
+        self.threadplotOn = False
+        self.threadplot.terminate()
+
+
+        # When stop button is clicked, opal kelly stops responding to commands. Error Code -8. Need to add part to
+        # re-secure opal kelly connection after terminating the data acquisition thread.
 
     def createControlGroupBox(self):
         self.controlGroupBox = QGroupBox("Controls")
@@ -232,7 +334,7 @@ class WidgetGallery(QDialog):
 
     def setPlotWidget(self, plot, xmin, xmax, ymin, ymax, xlabel, ylabel, xunit, yunit):
         plot.setLabel('bottom', xlabel, units=xunit)
-        plot.setLabel('left', ylabel, units=yunit)
+        plot.setLabel('left', ylabel, units='adf')
         plot.setXRange(xmin, xmax)
         plot.setYRange(ymin, ymax)
 
@@ -262,7 +364,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setApplicationName('SPADProbeAcquire')
     app.setStyle("fusion")
-    gallery = WidgetGallery()
-    gallery.resize(1200, 600)
-    gallery.show()
+    main = WidgetGallery()
+    main.resize(1200, 600)
+    main.show()
     sys.exit(app.exec_())

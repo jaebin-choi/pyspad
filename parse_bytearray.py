@@ -32,8 +32,6 @@ class ParseBytearray(object):
         self.goodframes = 0
         onegoodframe = np.zeros(npix, dtype=np.uint8)
 
-
-
         while nbyte < alen - npix*2:  # times 2 because every pixel is 16 bits, hence 2 bytes
             tempaddr = twobytes2addr(bytearraydata, nbyte + npix*2)
             if tempaddr == 0:  # if addr(nbyte+npix) returns to zero, meaning data in between is intact
@@ -51,8 +49,6 @@ class ParseBytearray(object):
         end = time.time()
         print("     Parsed in " + str(round(end - start, 3)) + " s.  " + str(self.goodframes) + " of " + str(
             datasize) + " frames are intact.")
-
-
 
     def get_data(self):
         return [self.img, self.scatt, self.goodframes]

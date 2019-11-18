@@ -7,6 +7,7 @@ import parse_bytearray
 import numpy as np
 
 
+
 class AcqOK(object):
     def __init__(self, flash, reset, reprogpll, parseenable, saveenable, getdata,
                  npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname):
@@ -88,7 +89,7 @@ class AcqOK(object):
 
             timestamp = np.zeros(inum)
             ts0 = time.time()
-            for i in range(0, inum):
+            for indexnow, i in enumerate(range(0, inum)):
 
                 device.UpdateWireOuts()
                 MemoryCount = device.GetWireOutValue(0x26)
@@ -122,8 +123,6 @@ class AcqOK(object):
                             # parse without saving rawdata. only save resulting images.
                             [self.img, self.scatt, self.goodframes] = parse_bytearray.ParseBytearray(npix, fnum,
                                                                         fignore, data_out).get_data()
-                            self.outputdata()  # output data for live imaging
-
                             # save parsed data to files
                             if saveenable:
                                 with open(sdir + '\\' + sname + '_parsedraw_' + str(i), 'wb') as f:
@@ -135,6 +134,8 @@ class AcqOK(object):
                             if saveenable:
                                 with open(sdir + '\\' + sname + '_unparsed_' + str(i), 'wb') as f:
                                     f.write(data_out)
+
+
                     else:
                         print(
                             '     TransferSize doesnt match. Amount of data retrieved from Pipe Out is %d Bytes' % code)
@@ -154,5 +155,5 @@ class AcqOK(object):
                     MemoryCount = device.GetWireOutValue(0x26)
                     # print('status 6')
 
-    def outputdata(self):
-        return [self.img, self.scatt, self.goodframes]
+    # def test(self, index):
+    #     return index
