@@ -40,8 +40,8 @@ class Parse(object):
                 nn = nn + (npix - tempaddr)
 
         end = time.time()
-        print("Parsed in " + str(round(end - start, 3)) + " s.  " + str(self.goodframes) + " of " + str(
-            datasize) + " frames are intact.")
+        # print("Parsed in " + str(round(end - start, 3)) + " s.  " + str(self.goodframes) + " of " + str(
+        #     datasize) + " frames are intact.")
 
     def get_data(self):
         return [self.img, self.scatt, self.goodframes]

@@ -89,7 +89,7 @@ class AcqOK(object):
 
             timestamp = np.zeros(inum)
             ts0 = time.time()
-            for indexnow, i in enumerate(range(0, inum)):
+            for i in range(0, inum):
 
                 device.UpdateWireOuts()
                 MemoryCount = device.GetWireOutValue(0x26)
@@ -154,6 +154,3 @@ class AcqOK(object):
                     device.UpdateWireOuts()
                     MemoryCount = device.GetWireOutValue(0x26)
                     # print('status 6')
-
-    # def test(self, index):
-    #     return index
