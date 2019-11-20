@@ -11,11 +11,9 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
                              QVBoxLayout, QWidget, QButtonGroup)
 import pyqtgraph as pg
 # pg.setConfigOption('background', 'w')
-
+from pathlib import Path
 import Constants
-import PlotRefresher
-import acquire_bytearray_extinput
-import acquire_bytearray_nooutput
+# import acquire_bytearray_extinput
 import os
 import parse_singledat
 
@@ -42,14 +40,58 @@ class WidgetGallery(QDialog):
         # declare locks
         self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
 
-        # run side thread
+        # create sidethread
         self.sidethreadinstance = threading.Thread(target=self.sideThread)
         self.stopsidethreadflag = threading.Event()
+
+        # create acqthread
+        self.acqthreadinstance = threading.Thread(target=self.acqThread)
+        self.stopacqthreadflag = threading.Event()
 
         # add to main thread timer
         self.mainThreadTimer = QTimer(self)
 
     ## THREADING #######################################################################################################
+
+    # acqThread: find most recent file and parse it.
+    def acqThread(self):
+        print('run acqThread')
+
+        self.getValuesFromGUI()
+        flash = False
+        reset = False
+        reprogpll = False
+        parseenable = False
+        saveenable = True
+        getdata = True
+
+        # [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable,
+        # saveenable, getdata, self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty,
+        # self.phase, self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
+
+        print('stopped acqThread')
+
+    def startAcqThread(self):
+        # create acqthread if it doesn't exist already
+        if not self.acqthreadinstance.isAlive():
+            print('creating acqthread')
+            self.acqthreadinstance = threading.Thread(target=self.acqThread)
+            self.stopacqthreadflag.clear()
+        else:
+            print('acqthread has already been created')
+
+        # run acqthread instance after creating it
+        try:
+            self.acqthreadinstance.start()
+        except RuntimeError as e:
+            print('acqthread is already running')
+        else:
+            self.stopacqthreadflag.clear()
+
+    def stopAcqThread(self):
+        self.stopacqthreadflag.set()
+
+
 
     # sideThread: find most recent file and parse it.
     def sideThread(self):
@@ -84,7 +126,7 @@ class WidgetGallery(QDialog):
         else:
             print('sidethread has already been created')
 
-        # run side thread instance after creating it
+        # run sidethread instance after creating it
         try:
             self.sidethreadinstance.start()
         except RuntimeError as e:
@@ -94,6 +136,8 @@ class WidgetGallery(QDialog):
 
     def stopSideThread(self):
         self.stopsidethreadflag.set()
+
+
 
     def mainThread(self):
         self.updatePlots()
@@ -208,9 +252,9 @@ class WidgetGallery(QDialog):
         saveenable = False
         getdata = False
 
-        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable,
-            saveenable, getdata, self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty,
-            self.phase, self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
+        # [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable,
+        # saveenable, getdata, self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty,
+        # self.phase, self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
 
     @pyqtSlot()
     def ifbtnResetClicked(self):
@@ -222,19 +266,22 @@ class WidgetGallery(QDialog):
         saveenable = False
         getdata = False
 
-        [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable,
-            saveenable, getdata, self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty,
-            self.phase, self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
+        # [self.img, self.scatt, self.goodframes] = acquire_bytearray_extinput.AcqOK(flash, reset, reprogpll, parseenable,
+        # saveenable, getdata, self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty,
+        # self.phase, self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname).outputdata()
 
     @pyqtSlot()
     def ifbtnRunClicked(self):
         self.startMainThread()
+        self.startAcqThread()
         self.startSideThread()
 
     @pyqtSlot()
     def ifbtnStopClicked(self):
         self.stopMainThread()
         print('mainthreadtimer stopped')
+        self.stopAcqThread()
+        print('acqthreadtimer stopped')
         self.stopSideThread()
         print('sidethread stopped')
 
