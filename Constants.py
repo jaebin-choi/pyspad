@@ -15,7 +15,5 @@ def Instance():
 
 
 class Constants(object):
-    ADC_DATA_CHECK_INTERVAL = 1  # in seconds
-    TRIGGER_OUT_CHECK_INTERVAL = 1  # in seconds
-    PLOT_REFRESHING_INTERVAL = 10  # in seconds
-    MAIN_UPDATING_INTERVAL = 10  # in seconds
+    PLOT_REFRESHING_INTERVAL = 100  # in milliseconds
+    MAIN_UPDATING_INTERVAL = 100  # in milliseconds
