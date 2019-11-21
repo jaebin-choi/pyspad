@@ -1,8 +1,6 @@
 import sys
 import time
 import ok
-import os
-import argparse
 import parse_bytearray
 import numpy as np
 

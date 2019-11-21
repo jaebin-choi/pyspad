@@ -1,26 +1,18 @@
-import glob
+import os
 import threading
 import time
-import numpy as np
-from PyQt5.QtCore import QDateTime, Qt, QTimer, pyqtSlot, QThread, QObject
-from PyQt5 import QtGui
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
-                             QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                             QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
-                             QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
-                             QVBoxLayout, QWidget, QButtonGroup)
-import pyqtgraph as pg
 # pg.setConfigOption('background', 'w')
 from pathlib import Path
+import numpy as np
+import pyqtgraph as pg
+from PyQt5.QtCore import QTimer, pyqtSlot
+from PyQt5.QtWidgets import (QApplication, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QRadioButton, QVBoxLayout, QButtonGroup)
 import Constants
-import os
-
-import acquire_bytearray_extflag
-import acquireandsave
+import itsallok
 import parse_singledat
-import signal
-import manageok
 
+fpga = itsallok.Instance()
 constants = Constants.Instance()
 
 
@@ -48,6 +40,9 @@ class WidgetGallery(QDialog):
         self.scatt = np.zeros(self.fnum * self.npix, dtype=np.uint8)
         self.goodframes = 0
 
+        # Connect ot hardware (Opal Kelly XEM3010)
+        self.connectFPGA()
+
         # declare locks
         self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
 
@@ -62,13 +57,27 @@ class WidgetGallery(QDialog):
         # add to main thread timer
         self.mainThreadTimer = QTimer(self)
 
-        signal.signal(signal.SIGINT, self.signal_handler)
+    ## OPAL KELLY ######################################################################################################
+
+    def connectFPGA(self):
+
+        fpga.OpenBySerial(fpga.GetDeviceListSerial(0))
+        print("Connecting Opal Kelly device ...")
+        if fpga.IsOpen():
+            print("Successfully connected to Opal Kelly.")
+        else:
+            print("Connection failed.")
+
+    def flashFPGA(self):
+        fpga.flash(self.bitfile)
+
+    def resetFPGA(self):
+        fpga.reset(self.rstcode)
+
+    def repllFPGA(self):
+        fpga.reprogPLL(self.flen, self.clkdiv, self.phase, self.duty, self.fpgaSwitches)
 
     ## THREADING #######################################################################################################
-
-    def signal_handler(signal):
-        global interrupted
-        interrupted = True
 
     # acqThread: find most recent file and parse it.
     def acqThread(self):
@@ -77,14 +86,19 @@ class WidgetGallery(QDialog):
         self.getValuesFromGUI()
         self.inputValuesToGUI()
 
-        enflash = True
-        enreset = True
-        enreprogpll = True
-        interrupted = False
+        ts0 = time.time()
+        timestamp = np.zeros(self.inum)
+        ii = 0
+        while (ii < self.inum) & (not self.stopacqthreadflag.is_set()):
+            [data_out, ts] = fpga.acquireDataSingle(self.fnum, self.fignore, self.fpgaSwitches)
+            timestamp[ii] = ts - ts0
+            with open(self.sdir + '\\' + self.sname + '_unparsed_i' + str(ii), 'wb') as f:
+                f.write(data_out)
+            print('     timestamp for image %i is: %f sec' % (ii, timestamp[ii]))
+            ii = ii + 1
 
-        manageok.ManageOK(enflash, enreset, enreprogpll, interrupted,
-            self.npix, self.bitfile, self.rstcode, self.fpgaSwitches, self.clkdiv, self.duty, self.phase,
-            self.flen, self.fignore, self.fnum, self.inum, self.sdir, self.sname + str(self.sidx).zfill(4), self.tsdir)
+        with open(self.tsdir + '\\' + self.sname + '_timestamp', 'wb') as f:
+            f.write(bytes(timestamp))
 
         print('stopped acqThread')
 
@@ -110,16 +124,21 @@ class WidgetGallery(QDialog):
 
     # sideThread: find most recent file and parse it.
     def sideThread(self):
-        print('run sideThread')
+        if self.enplot:
+            print('run sideThread')
+            prevfile = []
+            while not self.stopsidethreadflag.is_set():
+                newest = self.getLatestFile()
 
-        while not self.stopsidethreadflag.is_set():
-            newest = self.getLatestFile()
-            # self.datalock.acquire()
+                if prevfile != newest:
+                    prevfile = newest
+                    # print('     newest file is: ' + newest)
+                    # self.datalock.acquire()
+                    # Parse the bytearray file
+                    [self.img, self.scatt, self.goodframes] =\
+                        parse_singledat.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
+                    # self.datalock.release()
 
-            [self.img, self.scatt, self.goodframes] =\
-                parse_singledat.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
-
-            # self.datalock.release()
 
         print('stopped sideThread')
 
@@ -130,7 +149,6 @@ class WidgetGallery(QDialog):
             files[i] = str(pathnow / files[i])
         files = sorted(files, key=os.path.getmtime, reverse=True)
         newest = files[0]
-        print('newest file is: ' + newest)
         return newest
 
     def startSideThread(self):
@@ -155,7 +173,8 @@ class WidgetGallery(QDialog):
 
     # main thread
     def mainThread(self):
-        self.updatePlots()
+        if self.enplot:
+            self.updatePlots()
 
     def updatePlots(self):
         # self.datalock.acquire()
@@ -168,7 +187,7 @@ class WidgetGallery(QDialog):
         self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
         # self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
         # self.datalock.release()
-        print('plot was updated')
+        # print('plot was updated')
 
     def startMainThread(self):
         if self.mainThreadTimer.isActive():
@@ -191,7 +210,7 @@ class WidgetGallery(QDialog):
         self.stopMainThread()
         # Wait for the opal kelly components to clean itself properly
         # Otherwise core dump is likely to be raised
-        time.sleep(0.5)
+        time.sleep(5)
         event.accept()
 
     #########################################################################################################
@@ -234,11 +253,7 @@ class WidgetGallery(QDialog):
 
     def getValuesFromGUI(self):
         # Acquisition settings
-        self.Flash = int(self.tglFlash.isChecked())
-        self.Reset = int(self.tglReset.isChecked())
-        self.ReprogPLL = int(self.tglReprogPLL.isChecked())
-        self.Parse = int(self.tglParse.isChecked())
-        self.Save = int(self.tglSave.isChecked())
+        self.enplot = self.tglPlot.isChecked()
 
         # parameters
         self.bitfile = self.LEbitfile.text()
@@ -267,20 +282,15 @@ class WidgetGallery(QDialog):
     def ifbtnFlashClicked(self):
         self.getValuesFromGUI()
         self.inputValuesToGUI()
-        enflash = True
-        enreset = True
-        enreprogpll = True
+        self.flashFPGA()
 
 
     @pyqtSlot()
     def ifbtnResetClicked(self):
         self.getValuesFromGUI()
         self.inputValuesToGUI()
-        enflash = False
-        enreset = True
-        enreprogpll = True
-
-
+        self.resetFPGA()
+        self.repllFPGA()
 
     @pyqtSlot()
     def ifbtnRunClicked(self):
@@ -288,7 +298,7 @@ class WidgetGallery(QDialog):
         self.sidx = self.sidx + 1
         self.inputValuesToGUI()
         self.startAcqThread()
-        time.sleep(1)
+        time.sleep(0.1)
         self.startSideThread()
         self.startMainThread()
 
@@ -297,7 +307,6 @@ class WidgetGallery(QDialog):
         self.stopAcqThread()
         self.stopSideThread()
         self.stopMainThread()
-        interrupted = True
 
     def createControlGroupBox(self):
         self.controlGroupBox = QGroupBox("Controls")
@@ -328,17 +337,7 @@ class WidgetGallery(QDialog):
         # create buttons
         self.btnFlash = QPushButton("Flash");         self.btnFlash.setDefault(True)
         self.btnReset = QPushButton("Reset");         self.btnReset.setDefault(True)
-        btngroup1 = QButtonGroup(self.controlGroupBox);         btngroup1.setExclusive(False)
-        self.tglFlash = QRadioButton("Flash");         self.tglFlash.setChecked(False)
-        self.tglReset = QRadioButton("Reset");         self.tglReset.setChecked(True)
-        self.tglReprogPLL = QRadioButton("reprogram PLL");         self.tglReprogPLL.setChecked(False)
-        self.tglParse = QRadioButton("Parse");         self.tglParse.setChecked(False)
-        self.tglSave = QRadioButton("Save");         self.tglSave.setChecked(True)
-        btngroup1.addButton(self.tglFlash)
-        btngroup1.addButton(self.tglReset)
-        btngroup1.addButton(self.tglReprogPLL)
-        btngroup1.addButton(self.tglParse)
-        btngroup1.addButton(self.tglSave)
+        self.tglPlot = QRadioButton("Live Plotting");         self.tglPlot.setChecked(True)
         self.btnRun = QPushButton("Run");         self.btnRun.setDefault(False)
         self.btnStop = QPushButton("Stop");         self.btnStop.setDefault(False)
 
@@ -361,8 +360,8 @@ class WidgetGallery(QDialog):
         line = [Tsave, Tsdir, self.LEsdir, Tsname, self.LEsname, Tsidx, self.LEsidx]
         size = [2, 1, 30, 1, 30, 1, 10]
         self.layoutSingleLine(boxlayout, line, size)
-        line = [self.tglFlash, self.tglReset, self.tglReprogPLL, self.tglParse, self.tglSave, self.btnRun, self.btnStop]
-        size = [1, 1, 1, 1, 1, 100, 100]
+        line = [self.tglPlot, self.btnRun, self.btnStop]
+        size = [1, 2, 2]
         self.layoutSingleLine(boxlayout, line, size)
 
         self.controlGroupBox.setLayout(boxlayout)
@@ -410,6 +409,8 @@ class WidgetGallery(QDialog):
     #     curVal = self.progressBar.value()
     #     maxVal = self.progressBar.maximum()
     #     self.progressBar.setValue(curVal + int((maxVal - curVal) / 100))
+
+
 
 
 if __name__ == '__main__':
