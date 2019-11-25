@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (QApplication, QDialog, QGridLayout, QGroupBox, QHBo
 import Constants
 import itsallok
 import parse_singledat
+import parse_singledat2
 
 fpga = itsallok.Instance()
 constants = Constants.Instance()
@@ -88,14 +89,15 @@ class WidgetGallery(QDialog):
 
         ts0 = time.time()
         timestamp = np.zeros(self.inum)
-        ii = 0
-        while (ii < self.inum) & (not self.stopacqthreadflag.is_set()):
+        self.curi = 0
+        while (self.curi < self.inum) & (not self.stopacqthreadflag.is_set()):
+            print(threading.current_thread().ident)
             [data_out, ts] = fpga.acquireDataSingle(self.fnum, self.fignore, self.fpgaSwitches)
-            timestamp[ii] = ts - ts0
-            with open(self.sdir + '\\' + self.sname + '_unparsed_i' + str(ii), 'wb') as f:
+            timestamp[self.curi] = ts - ts0
+            with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi).zfill(3), 'wb') as f:
                 f.write(data_out)
-            print('     timestamp for image %i is: %f sec' % (ii, timestamp[ii]))
-            ii = ii + 1
+            print('     timestamp for image %i is: %f sec' % (self.curi, timestamp[self.curi]))
+            self.curi = self.curi + 1
 
         with open(self.tsdir + '\\' + self.sname + '_timestamp', 'wb') as f:
             f.write(bytes(timestamp))
@@ -103,6 +105,7 @@ class WidgetGallery(QDialog):
         print('stopped acqThread')
 
     def startAcqThread(self):
+        print(threading.current_thread().ident)
         # create acqthread if it doesn't exist already
         if not self.acqthreadinstance.isAlive():
             print('creating acqthread')
@@ -124,19 +127,24 @@ class WidgetGallery(QDialog):
 
     # sideThread: find most recent file and parse it.
     def sideThread(self):
+        print(threading.current_thread().ident)
         if self.enplot:
-            print('run sideThread')
             prevfile = []
             while not self.stopsidethreadflag.is_set():
-                newest = self.getLatestFile()
+                # newest = self.getLatestFile()
+                if self.curi > 1:
+                    newest = self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi-1).zfill(3)  # curi - 1 because curi may be being written
+                else:
+                    newest = 'empty'
 
-                if prevfile != newest:
+                if (prevfile[-3:] != newest[-3:]) & (self.curi < self.inum):
+                    print(threading.current_thread().ident)
                     prevfile = newest
                     # print('     newest file is: ' + newest)
                     # self.datalock.acquire()
                     # Parse the bytearray file
                     [self.img, self.scatt, self.goodframes] =\
-                        parse_singledat.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
+                        parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
                     # self.datalock.release()
 
 
@@ -183,6 +191,8 @@ class WidgetGallery(QDialog):
 
         self.plot2.plot(self.img)  # flattened image
         self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix])
+        # self.plot2.setData(self.img)
+        # self.plot3.setData(self.scatt[0:self.goodframes * self.npix])
 
         self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
         # self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
