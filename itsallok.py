@@ -94,9 +94,13 @@ class OKInstance(ok.okCFrontPanel):
         # print('status 1')
 
         # accumulate FPGA memory until MemoryCount is larger than TransferSize
+        t0 = time.time()
         while MemoryCount < TransferSize:  # /8
             self.UpdateWireOuts()
             MemoryCount = self.GetWireOutValue(0x26)
+
+        t1 = time.time()
+        print("\t\tTime to wait for fpga: " + str(t1-t0))
 
         # pipe out data
         code = self.ReadFromBlockPipeOut(0xa0, BlockSize, data_out)

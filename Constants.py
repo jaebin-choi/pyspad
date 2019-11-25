@@ -15,5 +15,5 @@ def Instance():
 
 
 class Constants(object):
-    PLOT_REFRESHING_INTERVAL = 100  # in milliseconds
-    MAIN_UPDATING_INTERVAL = 100  # in milliseconds
+    PLOT_REFRESHING_INTERVAL = 0.2  # in seconds
+    MAIN_UPDATING_INTERVAL = 200  # in milliseconds

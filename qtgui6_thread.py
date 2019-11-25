@@ -23,6 +23,7 @@ class WidgetGallery(QDialog):
 
         # global parameters upon initiation
         self.sidx = 0
+        self.curipublic = 0
         self.npix = 512
 
         # initialize GUI
@@ -51,16 +52,17 @@ class WidgetGallery(QDialog):
         self.sidethreadinstance = threading.Thread(target=self.sideThread)
         self.stopsidethreadflag = threading.Event()
         self.startSideThread()
-        self.sideThreadRunning = False
+        self.sideThreadON = False
 
         # create acqthread
         self.acqthreadinstance = threading.Thread(target=self.acqThread)
         self.stopacqthreadflag = threading.Event()
         self.startAcqThread()
-        self.acqThreadRunning = False
+        self.acqThreadON = False
 
         # add to main thread timer
         self.mainThreadTimer = QTimer(self)
+        self.startMainThread()
 
     ## OPAL KELLY ######################################################################################################
 
@@ -86,27 +88,36 @@ class WidgetGallery(QDialog):
 
     # acqThread: find most recent file and parse it.
     def acqThread(self):
-        print('run acqThread')
+        while not self.stopacqthreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):
+            if self.acqThreadON:
+                print('run acqThread')
 
-        self.getValuesFromGUI()
-        self.inputValuesToGUI()
+                self.getValuesFromGUI()
+                self.inputValuesToGUI()
 
-        ts0 = time.time()
-        timestamp = np.zeros(self.inum)
-        self.curi = 0
-        while (self.curi < self.inum) & (not self.stopacqthreadflag.is_set()):
-            # print(threading.current_thread().ident)
-            [data_out, ts] = fpga.acquireDataSingle(self.fnum, self.fignore, self.fpgaSwitches)
-            timestamp[self.curi] = ts - ts0
-            with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi).zfill(3), 'wb') as f:
-                f.write(data_out)
-            print('     timestamp for image %i is: %f sec' % (self.curi, timestamp[self.curi]))
-            self.curi = self.curi + 1
+                ts0 = time.time()
+                timestamp = np.zeros(self.inum)
+                self.curi = 0
+                while (self.curi < self.inum) & self.acqThreadON:  # (not self.stopacqthreadflag.is_set()):
+                    # print(threading.current_thread().ident)
+                    [data_out, ts] = fpga.acquireDataSingle(self.fnum, self.fignore, self.fpgaSwitches)
+                    timestamp[self.curi] = ts - ts0
+                    with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi).zfill(3), 'wb') as f:
+                        f.write(data_out)
+                    print('     timestamp for image %i is: %f sec' % (self.curi, timestamp[self.curi]))
 
-        with open(self.tsdir + '\\' + self.sname + '_timestamp', 'wb') as f:
-            f.write(bytes(timestamp))
+                    self.datalock.acquire()
+                    self.curipublic = self.curi
+                    self.datalock.release()
 
-        print('stopped acqThread')
+                    self.curi = self.curi + 1
+
+                with open(self.tsdir + '\\' + self.sname + '_timestamp', 'wb') as f:
+                    f.write(bytes(timestamp))
+
+                print('stopped acqThread')
+                self.acqThreadON = False
+                self.sideThreadON = False
 
     def startAcqThread(self):
         # print(threading.current_thread().ident)
@@ -121,7 +132,8 @@ class WidgetGallery(QDialog):
 
         # run acqthread instance after creating it
         try:
-            self.acqthreadinstance.start()
+            print('starting acqthread')
+            self.acqthreadinstance.start()  # should only be run once
         except RuntimeError as e:
             print('acqthread is already running')
         else:
@@ -132,28 +144,31 @@ class WidgetGallery(QDialog):
 
     # sideThread: find most recent file and parse it.
     def sideThread(self):
-        # print(threading.current_thread().ident)
-        if self.enplot:
-            prevfile = []
-            while not self.stopsidethreadflag.is_set():
-                newest = self.getLatestFile()
-                # if self.curi > 1:
-                #     newest = self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi-1).zfill(3)  # curi - 1 because curi may be being written
-                # else:
-                #     newest = 'empty'
-
-                if (prevfile[-3:] != newest[-3:]) & (self.curi < self.inum):
-                    # print(threading.current_thread().ident)
-                    prevfile = newest
-                    # print('     newest file is: ' + newest)
-                    self.datalock.acquire()
-                    # Parse the bytearray file
-                    [self.img, self.scatt, self.goodframes] =\
-                        parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
-                    self.datalock.release()
+        while not self.stopsidethreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):
+            if self.sideThreadON:
+                # print(threading.current_thread().ident)
+                if self.enplot:
+                    prevfile = []
+                    while not self.stopsidethreadflag.is_set():
+                        # newest = self.getLatestFile()
+                        if self.curipublic > 1:
+                            newest = self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curipublic-1).zfill(3)  # curi - 1 because curi may be being written
+                        else:
+                            return
+                            # newest = 'empty'
 
 
-        print('stopped sideThread')
+                        if (prevfile[-3:] != newest[-3:]) & (self.curipublic < self.inum):
+                            # print(threading.current_thread().ident)
+                            prevfile = newest
+                            # print('     newest file is: ' + newest)
+                            #self.datalock.acquire()
+                            # Parse the bytearray file
+                            [self.img, self.scatt, self.goodframes] =\
+                                parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
+                            #self.datalock.release()
+
+                print('stopped sideThread')
 
     def getLatestFile(self):
         pathnow = Path(os.getcwd()) / self.sdir
@@ -176,6 +191,7 @@ class WidgetGallery(QDialog):
 
         # run sidethread instance after creating it
         try:
+            print('starting sidethread')
             self.sidethreadinstance.start()
         except RuntimeError as e:
             print('sidethread is already running')
@@ -227,7 +243,7 @@ class WidgetGallery(QDialog):
         self.stopMainThread()
         # Wait for the opal kelly components to clean itself properly
         # Otherwise core dump is likely to be raised
-        time.sleep(5)
+        time.sleep(1)
         event.accept()
 
     #########################################################################################################
@@ -317,16 +333,21 @@ class WidgetGallery(QDialog):
         # self.startAcqThread()
         # time.sleep(0.1)
         # self.startSideThread()
-        # self.startMainThread()
-        self.acqThreadRunning = True
-        time.sleep(0.1)
-        self.sideThreadRunning = True
+        self.acqThreadON = True
+        # print('Run clicked, acqThreadON True')
+        # time.sleep(0.1)
+        self.sideThreadON = True
+        # print('Run clicked, sideThreadON True')
 
     @pyqtSlot()
     def ifbtnStopClicked(self):
-        self.stopAcqThread()
-        self.stopSideThread()
-        self.stopMainThread()
+        # self.stopAcqThread()
+        # self.stopSideThread()
+        # self.stopMainThread()
+        self.acqThreadON = False
+        print('Stop clicked, acqThreadON False')
+        self.sideThreadON = False
+        print('Stop clicked, sideThreadON False')
 
     def createControlGroupBox(self):
         self.controlGroupBox = QGroupBox("Controls")
