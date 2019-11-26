@@ -86,6 +86,13 @@ class OKInstance(ok.okCFrontPanel):
         # scatt = np.zeros(fnum * npix, dtype=np.uint8)
         # goodframes = 0
 
+        # Reset RAM and restart FSM
+        self.SetWireInValue(0x00, int(0x00000007))  # set to reset state
+        self.UpdateWireIns()
+        self.SetWireInValue(0x00, int(fpgaSwitches, 2))  # start FSM
+        self.UpdateWireIns()
+        timestamp = time.time()  # timestamp when started recording
+
         self.UpdateWireOuts()
         MemoryCount = self.GetWireOutValue(0x26)
         data_out = bytearray((fnum + fignore) * 1024)  # Bytes
@@ -94,17 +101,12 @@ class OKInstance(ok.okCFrontPanel):
         # print('status 1')
 
         # accumulate FPGA memory until MemoryCount is larger than TransferSize
-        t0 = time.time()
         while MemoryCount < TransferSize:  # /8
             self.UpdateWireOuts()
             MemoryCount = self.GetWireOutValue(0x26)
 
-        t1 = time.time()
-        print("\t\tTime to wait for fpga: " + str(t1-t0))
-
         # pipe out data
         code = self.ReadFromBlockPipeOut(0xa0, BlockSize, data_out)
-        timestamp = time.time()  # timestamp when data finished reading
         if code == TransferSize:
             # save readout data into bytearray
             # print('     TransferSize match. Data Retrieved: %.1f kB(frames)' % float(int(code) / 1024))
@@ -121,11 +123,11 @@ class OKInstance(ok.okCFrontPanel):
                 "     Data was not retrieved correctly. Error code returned is %d Bytes" % code)
             # print('status 5')
 
-        # Reset RAM and restart FSM
-        self.SetWireInValue(0x00, int(0x00000007))  # set to reset state
-        self.UpdateWireIns()
-        self.SetWireInValue(0x00, int(fpgaSwitches, 2))  # start FSM
-        self.UpdateWireIns()
+        # # Reset RAM and restart FSM
+        # self.SetWireInValue(0x00, int(0x00000007))  # set to reset state
+        # self.UpdateWireIns()
+        # self.SetWireInValue(0x00, int(fpgaSwitches, 2))  # start FSM
+        # self.UpdateWireIns()
 
         # self.device.UpdateWireOuts()
         # MemoryCount = self.device.GetWireOutValue(0x26)  # should be zero

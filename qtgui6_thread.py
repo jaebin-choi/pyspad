@@ -144,33 +144,31 @@ class WidgetGallery(QDialog):
 
     # sideThread: find most recent file and parse it.
     def sideThread(self):
-        while not self.stopsidethreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):
-            if self.sideThreadON:
-                # print(threading.current_thread().ident)
-                if self.enplot:
-                    prevfile = []
-                    while not self.stopsidethreadflag.is_set():
-                        # newest = self.getLatestFile()
-                        if self.curipublic > 1:
-                            newest = self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curipublic-1).zfill(3)  # curi - 1 because curi may be being written
-                        else:
-                            return
-                            # newest = 'empty'
+        while not self.stopsidethreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):  # this starts once and always runs until end
+            prevfile = []
+            newest = ''
+            while self.sideThreadON:  # not self.stopsidethreadflag.is_set():
+                # newest = self.getLatestFile()
+                newest = self.sdir + '\\' + \
+                         self.sname + '_raw' + str(self.sidx).zfill(3) +'_i' + str(self.curipublic).zfill(3)
 
+                if os.path.exists(newest):
+                    if (prevfile[-2:] != newest[-2:]):
+                        prevfile = newest
+                        # print('file is new, so parse')
 
-                        if (prevfile[-3:] != newest[-3:]) & (self.curipublic < self.inum):
-                            # print(threading.current_thread().ident)
-                            prevfile = newest
-                            # print('     newest file is: ' + newest)
-                            #self.datalock.acquire()
-                            # Parse the bytearray file
-                            [self.img, self.scatt, self.goodframes] =\
-                                parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
-                            #self.datalock.release()
+                        #self.datalock.acquire()
+                        # Parse the bytearray file
+                        [self.img, self.scatt, self.goodframes] =\
+                            parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
+                        #self.datalock.release()
+                    else:
+                        self.sideThreadON = False
+                        # print('data no longer new')
 
-                print('stopped sideThread')
+            # print('stopped sideThread')
 
-    def getLatestFile(self):
+    def getLatestFile(self):  # no longer used, because index of it is known
         pathnow = Path(os.getcwd()) / self.sdir
         files = os.listdir(str(pathnow))
         for i in range(0, len(files)):
@@ -198,12 +196,13 @@ class WidgetGallery(QDialog):
         else:
             self.stopsidethreadflag.clear()
 
-    def stopSideThread(self):
+    def stopSideThread(self):  # only called when application is closed.
         self.stopsidethreadflag.set()
 
     # main thread
     def mainThread(self):
         if self.enplot:
+            self.sideThreadON = True
             self.updatePlots()
 
     def updatePlots(self):
@@ -334,10 +333,7 @@ class WidgetGallery(QDialog):
         # time.sleep(0.1)
         # self.startSideThread()
         self.acqThreadON = True
-        # print('Run clicked, acqThreadON True')
-        # time.sleep(0.1)
         self.sideThreadON = True
-        # print('Run clicked, sideThreadON True')
 
     @pyqtSlot()
     def ifbtnStopClicked(self):
@@ -345,9 +341,8 @@ class WidgetGallery(QDialog):
         # self.stopSideThread()
         # self.stopMainThread()
         self.acqThreadON = False
-        print('Stop clicked, acqThreadON False')
         self.sideThreadON = False
-        print('Stop clicked, sideThreadON False')
+        print('Stop clicked')
 
     def createControlGroupBox(self):
         self.controlGroupBox = QGroupBox("Controls")
