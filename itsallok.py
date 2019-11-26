@@ -30,7 +30,7 @@ class OKInstance(ok.okCFrontPanel):
         if flerr == 0:
             print('     Opal Kelly Flash Successful.')
         else:
-            print('     Opal Kelly Flash with error code ', flerr)
+            print('     Opal Kelly Flash Error: error code ', flerr)
 
         if self.IsFrontPanelEnabled():  # IsFrontPanelEnabled returns true if FrontPanel is detected.
             print("     FrontPanel host interface enabled.")

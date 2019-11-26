@@ -1,3 +1,5 @@
+print('python code starting')
+
 import os
 import threading
 import time
@@ -10,7 +12,6 @@ from PyQt5.QtWidgets import (QApplication, QDialog, QGridLayout, QGroupBox, QHBo
                              QPushButton, QRadioButton, QVBoxLayout, QButtonGroup)
 import Constants
 import itsallok
-import parse_singledat
 import parse_singledat2
 
 fpga = itsallok.Instance()
@@ -30,6 +31,7 @@ class WidgetGallery(QDialog):
         self.initializeGUI()
         self.getValuesFromGUI()
         self.inputValuesToGUI()
+        self.createDirs()  # create dirs
 
         # connect buttons
         self.btnRun.clicked.connect(self.ifbtnRunClicked)
@@ -112,7 +114,7 @@ class WidgetGallery(QDialog):
 
                     self.curi = self.curi + 1
 
-                with open(self.tsdir + '\\' + self.sname + '_timestamp', 'wb') as f:
+                with open(self.tsdir + '\\' + self.sname + '_timestamp' + str(self.sidx).zfill(3), 'wb') as f:
                     f.write(bytes(timestamp))
 
                 print('stopped acqThread')
@@ -247,6 +249,14 @@ class WidgetGallery(QDialog):
 
     #########################################################################################################
 
+    def createDirs(self):
+        if not os.path.exists(self.sdir):
+            os.mkdir(self.sdir)
+
+        if not os.path.exists(self.tsdir):
+            os.mkdir(self.tsdir)
+
+
     def initializeGUI(self):
         # create widgets
         self.originalPalette = QApplication.palette()
@@ -326,6 +336,7 @@ class WidgetGallery(QDialog):
 
     @pyqtSlot()
     def ifbtnRunClicked(self):
+        print('Run clicked')
         self.getValuesFromGUI()
         self.sidx = self.sidx + 1
         self.inputValuesToGUI()
@@ -451,11 +462,13 @@ class WidgetGallery(QDialog):
 
 if __name__ == '__main__':
     import sys
+    print('Initializing application')
 
     app = QApplication(sys.argv)
     app.setApplicationName('SPADProbeAcquire')
     app.setStyle("fusion")
     main = WidgetGallery()
+    print('Creating WidgetGallery')
     main.resize(1200, 600)
     main.show()
     sys.exit(app.exec_())
