@@ -1,8 +1,11 @@
 import sys
 import time
 import ok
+import os
+import argparse
 import parse_bytearray
 import numpy as np
+
 
 
 class AcqOK(object):
@@ -120,8 +123,6 @@ class AcqOK(object):
                             # parse without saving rawdata. only save resulting images.
                             [self.img, self.scatt, self.goodframes] = parse_bytearray.ParseBytearray(npix, fnum,
                                                                         fignore, data_out).get_data()
-                            self.outputdata()  # output data for live imaging
-
                             # save parsed data to files
                             if saveenable:
                                 with open(sdir + '\\' + sname + '_parsedraw_' + str(i), 'wb') as f:
@@ -133,6 +134,8 @@ class AcqOK(object):
                             if saveenable:
                                 with open(sdir + '\\' + sname + '_unparsed_' + str(i), 'wb') as f:
                                     f.write(data_out)
+
+
                     else:
                         print(
                             '     TransferSize doesnt match. Amount of data retrieved from Pipe Out is %d Bytes' % code)
@@ -151,6 +154,3 @@ class AcqOK(object):
                     device.UpdateWireOuts()
                     MemoryCount = device.GetWireOutValue(0x26)
                     # print('status 6')
-
-    def outputdata(self):
-        return [self.img, self.scatt, self.goodframes]

@@ -16,7 +16,7 @@ class Parse(object):
         alen = len(aint)
 
         # find first point where addr=0 after trimming ignoreframes
-        nstart = ignoreframes * npix * 2
+        nstart = ignoreframes * npix
         tempaddr = (aint[nstart]) >> 6  # rotate right by 6 to extract address, because data bits don't wrap around
         # tempaddr = (aint[nstart] & (np.power(2,17)-np.power(2,7)))>>6 #zero data and rotate right by 6 to extract address
         nn = nstart + (512 - tempaddr)  # initial starting point

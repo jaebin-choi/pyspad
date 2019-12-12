@@ -7,11 +7,7 @@ import numpy as np
 
 class AcqOK(object):
     def __init__(self, flash, reset, reprogpll, parseenable, saveenable, getdata,
-                 npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname):
-
-        fnum = int(fnum)
-        fignore = int(fignore)
-        npix = int(npix)
+            npix, bitfile, rstcode, fpgaSwitches, clkdiv, duty, phase, flen, fignore, fnum, inum, sdir, sname, interrupted):
 
         # FIND AND OPEN THE OPAL KELLY (CAN ONLY RECOGNIZE SINGLE DEVICE) ----------- ----------- ----------- ----------- -----------
         device = ok.okCFrontPanel()
@@ -79,14 +75,17 @@ class AcqOK(object):
         if getdata:
 
             BlockSize = 256  # in bytes, important to be the same as in the VHDL code otherwise data could be different
-            inum = int(inum)
             # device.UpdateWireOuts()
             # MemoryCount = device.GetWireOutValue(0x26)
             # print('     Current memory count is: %d ' % MemoryCount)
 
             timestamp = np.zeros(inum)
             ts0 = time.time()
+            interrupted = False
             for i in range(0, inum):
+
+                if interrupted:
+                    break
 
                 device.UpdateWireOuts()
                 MemoryCount = device.GetWireOutValue(0x26)
