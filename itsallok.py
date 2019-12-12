@@ -69,7 +69,7 @@ class OKInstance(ok.okCFrontPanel):
 
         self.UpdateWireOuts()
         statusWire = self.GetWireOutValue(0x24)
-        print('     PLL reprogrammed. Status is ', statusWire)
+        print('     PLL reprogrammed. Status is ', statusWire, '(3 when normal)')
 
         # Reset RAM and restart FSM
         self.SetWireInValue(0x00, int(0x00000007))  # set to reset state

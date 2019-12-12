@@ -1,3 +1,5 @@
+import glob
+
 print('python code starting')
 
 import os
@@ -27,6 +29,9 @@ class WidgetGallery(QDialog):
         self.curipublic = 0
         self.npix = 512
 
+        # declare locks
+        self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
+
         # initialize GUI
         self.initializeGUI()
         self.createDirs()  # create dirs
@@ -45,8 +50,7 @@ class WidgetGallery(QDialog):
         # Connect ot hardware (Opal Kelly XEM3010)
         self.connectFPGA()
 
-        # declare locks
-        self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
+
 
         # create sidethread : search recent and plot thread
         self.sidethreadinstance = threading.Thread(target=self.sideThread)
@@ -91,7 +95,6 @@ class WidgetGallery(QDialog):
         while not self.stopacqthreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):
             if self.acqThreadON:
                 print('run acqThread')
-
                 self.getValuesFromGUI()
                 self.inputValuesToGUI()
 
@@ -102,8 +105,10 @@ class WidgetGallery(QDialog):
                     # print(threading.current_thread().ident)
                     [data_out, ts] = fpga.acquireDataSingle(self.fnum, self.fignore, self.fpgaSwitches)
                     timestamp[self.curi] = ts - ts0
-                    with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi).zfill(3), 'wb') as f:
+                    self.datalock.acquire()
+                    with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(self.curi).zfill(4), 'wb') as f:
                         f.write(data_out)
+                    self.datalock.release()
                     dT = (timestamp[self.curi] - timestamp[max(0, self.curi-1)]) * 1000
                     print('     Image %i Timestamp = %.3f s, dT = %.2f ms' % (self.curi, timestamp[self.curi], dT))
 
@@ -147,25 +152,40 @@ class WidgetGallery(QDialog):
     def sideThread(self):
         while not self.stopsidethreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):  # this starts once and always runs until end
             prevfile = []
-            newest = ''
+            newest = None
             while self.sideThreadON:  # not self.stopsidethreadflag.is_set():
                 # newest = self.getLatestFile()
                 newest = self.sdir + '\\' + \
-                         self.sname + '_raw' + str(self.sidx).zfill(3) +'_i' + str(self.curipublic).zfill(3)
+                         self.sname + '_raw' + str(self.sidx).zfill(3) +'_i' + str(self.curipublic).zfill(4)
 
-                if os.path.exists(newest):
-                    if (prevfile[-2:] != newest[-2:]):
+                if os.path.exists(newest):  # if there is such a file
+                    if (prevfile[-2:] != newest[-2:]):  # if file has been updated, parse and plot.
                         prevfile = newest
                         # print('file is new, so parse')
 
-                        #self.datalock.acquire()
+                        self.datalock.acquire()
                         # Parse the bytearray file
                         [self.img, self.scatt, self.goodframes] =\
                             parse_singledat2.Parse(self.npix, self.fnum, self.fignore, newest).get_data()
-                        #self.datalock.release()
-                    else:
-                        self.sideThreadON = False
-                        # print('data no longer new')
+                        self.datalock.release()
+                    # else:  # if file has not been updated, stop side thread.
+                    #     self.sideThreadON = False
+                    #     print('data no longer new')
+
+                    # if not self.ensave:  # delete all recent files
+                    #     recentdeletion = -1
+                    #     for filename in glob.glob(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i*'):
+                    #         currentindex = int(filename[-3:])
+                    #         print('current index: ' + str(currentindex))
+                    #         if recentdeletion < currentindex < self.curipublic:
+                    #             os.remove(filename)
+                    #             print('deleted file: ' + filename)
+                    #             recentdeletion = currentindex
+
+                        # with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(
+                        #         self.curi).zfill(3), 'wb') as f:
+                        #     f.write(data_out)
+
 
             # print('stopped sideThread')
 
@@ -202,11 +222,11 @@ class WidgetGallery(QDialog):
 
     # main thread
     def mainThread(self):
-        if self.enplot:
-            self.sideThreadON = True
-            self.updatePlots()
+        if self.enplot & self.sideThreadON:
+            self.updatePlots()  # must be in main thread.
 
     def updatePlots(self):
+        print('updatePlots')
         self.plot2.clear()
         self.plot3.clear()
 
@@ -258,6 +278,7 @@ class WidgetGallery(QDialog):
         # create widgets
         self.originalPalette = QApplication.palette()
         self.createControlGroupBox()
+
         self.getValuesFromGUI()
         self.inputValuesToGUI()
         self.createProgressBar()
@@ -292,6 +313,7 @@ class WidgetGallery(QDialog):
         print('GUI initialized.')
 
     def getValuesFromGUI(self):
+        self.datalock.acquire()
         # Acquisition settings
         self.ensave = self.tglSave.isChecked()
         self.enplot = self.tglPlot.isChecked()
@@ -311,13 +333,16 @@ class WidgetGallery(QDialog):
         self.sdir = self.LEsdir.text()  # directory where data are saved
         self.sname = self.LEsname.text()
         self.tsdir = 'timestamp'  # directory where timestamps are saved
+        self.datalock.release()
 
     def inputValuesToGUI(self):
+        self.datalock.acquire()
         self.tacq = (self.flen)*self.fnum*(self.duty/100)/(self.frep*1000000)  # acquisition time per image (sec)
         self.clkdiv = round(int(self.fvco) / int(self.frep))
 
         self.LEtacq.setText(str(self.tacq))
         self.LEsidx.setText(str(self.sidx))
+        self.datalock.release()
 
     @pyqtSlot()
     def ifbtnFlashClicked(self):
@@ -357,6 +382,7 @@ class WidgetGallery(QDialog):
         # self.stopAcqThread()
         # self.stopSideThread()
         # self.stopMainThread()
+        self.enplot = False
         self.acqThreadON = False
         self.sideThreadON = False
         print('Stop clicked')
@@ -390,10 +416,14 @@ class WidgetGallery(QDialog):
         # create buttons
         self.btnFlash = QPushButton("Flash");         self.btnFlash.setDefault(True)
         self.btnReset = QPushButton("Reset");         self.btnReset.setDefault(True)
-        self.tglSave = QRadioButton("Save data");         self.tglSave.setChecked(True)
-        self.tglPlot = QRadioButton("Live Plotting");         self.tglPlot.setChecked(True)
         self.btnRun = QPushButton("Run");         self.btnRun.setDefault(False)
         self.btnStop = QPushButton("Stop");         self.btnStop.setDefault(False)
+        self.tglSave = QRadioButton("Save data");         self.tglSave.setChecked(True)
+        self.tglPlot = QRadioButton("Live Plotting");         self.tglPlot.setChecked(True)
+        btngroup1 = QButtonGroup(self.controlGroupBox); btngroup1.setExclusive(False)
+        btngroup2 = QButtonGroup(self.controlGroupBox); btngroup2.setExclusive(False)
+        btngroup1.addButton(self.tglSave)
+        btngroup2.addButton(self.tglPlot)
 
         # create layout
         boxlayout = QVBoxLayout()
