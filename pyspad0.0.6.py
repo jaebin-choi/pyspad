@@ -462,11 +462,11 @@ class WidgetGallery(QDialog):
         self.LEfvco = QLineEdit('960')
         self.LEfrep = QLineEdit('10')
         self.LEduty = QLineEdit('50')
-        self.LEphase = QLineEdit('180')
+        self.LEphase = QLineEdit('0')
         self.LEflen = QLineEdit('1000')
         self.LEfignore = QLineEdit('10')
-        self.LEfnum = QLineEdit('1000')
-        self.LEinum = QLineEdit('20')  # or infinite
+        self.LEfnum = QLineEdit('100')
+        self.LEinum = QLineEdit('100')  # or infinite
         self.LEtacq = QLineEdit('-')
         self.LEsdir = QLineEdit('rawdata')
         self.LEsname = QLineEdit('sample')

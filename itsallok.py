@@ -95,7 +95,7 @@ class OKInstance(ok.okCFrontPanel):
 
         self.UpdateWireOuts()
         MemoryCount = self.GetWireOutValue(0x26)
-        data_out = bytearray((fnum + fignore) * 1024)  # Bytes
+        data_out = bytearray((fnum + fignore + 1) * 1024)  # Bytes
         TransferSize = len(data_out)
         # print('     Now transferring {} KB of data from FPGA to PC'.format(TransferSize))
         # print('status 1')
