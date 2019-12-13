@@ -27,7 +27,10 @@ class WidgetGallery(QDialog):
         # global parameters upon initiation
         self.sidx = 0
         self.curipublic = 0
+        self.lastdeleted = 0
+        self.deletebuffer = 1
         self.npix = 512
+
 
         # declare locks
         self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
@@ -152,7 +155,7 @@ class WidgetGallery(QDialog):
     def sideThread(self):
         while not self.stopsidethreadflag.wait(constants.PLOT_REFRESHING_INTERVAL):  # this starts once and always runs until end
             prevfile = []
-            newest = None
+            # newest = None
             while self.sideThreadON:  # not self.stopsidethreadflag.is_set():
                 # newest = self.getLatestFile()
                 newest = self.sdir + '\\' + \
@@ -172,22 +175,20 @@ class WidgetGallery(QDialog):
                     #     self.sideThreadON = False
                     #     print('data no longer new')
 
-                    # if not self.ensave:  # delete all recent files
-                    #     recentdeletion = -1
-                    #     for filename in glob.glob(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i*'):
-                    #         currentindex = int(filename[-3:])
-                    #         print('current index: ' + str(currentindex))
-                    #         if recentdeletion < currentindex < self.curipublic:
-                    #             os.remove(filename)
-                    #             print('deleted file: ' + filename)
-                    #             recentdeletion = currentindex
-
-                        # with open(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i' + str(
-                        #         self.curi).zfill(3), 'wb') as f:
-                        #     f.write(data_out)
-
-
-            # print('stopped sideThread')
+                    if not self.ensave:  # if save switch is off, delete all recent files
+                        if self.lastdeleted < self.curipublic - self.deletebuffer:
+                            for filename in glob.glob(self.sdir + '\\' + self.sname + '_raw' + str(self.sidx).zfill(3) + '_i*'):
+                                currentindex = int(filename[-3:])
+                                # print('deleting everything before: ' + str(self.curipublic - self.deletebuffer))
+                                if currentindex < self.curipublic - self.deletebuffer:
+                                    try:
+                                        # print('delete', filename)
+                                        os.remove(filename)
+                                    except OSError as e:
+                                        # print('error')
+                                        time.sleep(0.1)
+                                    # print('deleted file: ' + filename)
+                            self.lastdeleted = self.lastdeleted + self.deletebuffer
 
     def getLatestFile(self):  # no longer used, because index of it is known
         pathnow = Path(os.getcwd()) / self.sdir
@@ -226,7 +227,6 @@ class WidgetGallery(QDialog):
             self.updatePlots()  # must be in main thread.
 
     def updatePlots(self):
-        print('updatePlots')
         self.plot2.clear()
         self.plot3.clear()
 
@@ -356,6 +356,7 @@ class WidgetGallery(QDialog):
         self.getValuesFromGUI()
         self.inputValuesToGUI()
         self.curipublic = 0
+        self.lastdeleted = self.deletebuffer
         self.resetFPGA()
         self.repllFPGA()
 
@@ -366,6 +367,7 @@ class WidgetGallery(QDialog):
         self.sidx = self.sidx + 1
         self.inputValuesToGUI()
         self.curipublic = 0
+        self.lastdeleted = self.deletebuffer
         self.progressBar.setRange(0, self.inum - 1)
         self.progressBar.setValue(0)
 
