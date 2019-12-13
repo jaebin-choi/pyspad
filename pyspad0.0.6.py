@@ -31,7 +31,6 @@ class WidgetGallery(QDialog):
         self.deletebuffer = 1
         self.npix = 512
 
-
         # declare locks
         self.datalock = threading.RLock()  # only blocks if the lock is held by ANOTHER thread
 
@@ -50,10 +49,8 @@ class WidgetGallery(QDialog):
         self.scatt = np.zeros(self.fnum * self.npix, dtype=np.uint8)
         self.goodframes = 0
 
-        # Connect ot hardware (Opal Kelly XEM3010)
+        # Connect to hardware (Opal Kelly XEM3010)
         self.connectFPGA()
-
-
 
         # create sidethread : search recent and plot thread
         self.sidethreadinstance = threading.Thread(target=self.sideThread)
@@ -232,11 +229,16 @@ class WidgetGallery(QDialog):
 
         self.datalock.acquire()
         self.plot2.plot(self.img)  # flattened image
-        self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix])
-        # self.plot3.setData(self.scatt[0:self.goodframes * self.npix])
+        scatterx = np.tile(range(0, self.npix), self.goodframes)
+        self.plot3.plot(scatterx, self.scatt[0:self.goodframes * self.npix])
 
-        # self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')  # might have to revive for scaling
+        # scatter plot below takes a long time
+        # self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix], pen=None, symbol='o', symbolSize=1)
+
+        # scale plot axes. commented out for now, but may have to revive.
+        # self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
         # self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
+
         self.datalock.release()
         # print('plot was updated')
 
