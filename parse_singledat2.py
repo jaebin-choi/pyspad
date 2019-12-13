@@ -33,7 +33,8 @@ class Parse(object):
             tempaddr = (aint[nn + npix]) >> 6  # rotate right by 6 to extract address
             if tempaddr == 0:  # if addr(nn+npix) returns to zero, meaning data in between is intact
                 onegoodframe = aint[nn:nn + npix] & int('111111', 2)  # extract data
-                # override last pixel to zero, to prevent scatterplot from drawing line from last to first pixel.
+                # override first/last pixel to zero, to prevent scatterplot from drawing line from last to first pixel.
+                onegoodframe[0] = 0  # only for plotting purposes.
                 onegoodframe[-1] = 0  # only for plotting purposes.
                 self.scatt[self.goodframes * npix: (self.goodframes + 1) * npix] = onegoodframe
                 self.img = self.img + np.uint64(onegoodframe)  # arraywise and to extract 6bit data

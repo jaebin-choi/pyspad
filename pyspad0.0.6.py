@@ -236,7 +236,7 @@ class WidgetGallery(QDialog):
         # self.plot3.plot(np.tile(range(0, self.npix), self.goodframes), self.scatt[0:self.goodframes * self.npix], pen=None, symbol='o', symbolSize=1)
 
         # scale plot axes. commented out for now, but may have to revive.
-        # self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
+        self.setPlotWidget(self.plot2, 0, 512, 0, max(self.img), 'Pixel', 'Accumulated Counts', '', '')
         # self.setPlotWidget(self.plot3, 0, 512, 0, max(self.scatt), 'Pixel', 'Flattened Counts', '', '')
 
         self.datalock.release()
