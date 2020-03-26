@@ -1,3 +1,9 @@
+"""
+GUI for SPAD Image Acquisition
+Jaebin Choi, jc3797@columbia.edu
+Columbia University
+"""
+
 import numpy as np
 import time
 
